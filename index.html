@@ -38,6 +38,7 @@
           <th>Tên dự án</th>
           <th>Công việc</th>
           <th>Tiến độ</th>
+          <th>Báo cáo kết quả</th>
           <th>Đánh giá</th>
           <th>Vướng mắc</th>
           <th>Xoá</th>
@@ -100,36 +101,51 @@
       tbody.appendChild(renderRow({}, null, true));
     }
   });
+function renderRow(data, docId, isNew = false) {
+  const tr = document.createElement("tr");
+  const fields = ["name", "task", "progress", "report", "result", "issue"];
+  const cells = {};
 
-  function renderRow(data, docId, isNew = false) {
-    const tr = document.createElement("tr");
-    const fields = ["name", "task", "progress", "result", "issue"];
-    const cells = {};
+  fields.forEach((field) => {
+    const td = document.createElement("td");
+    td.classList.add("editable");
+    td.textContent = data[field] || "";
+    cells[field] = td;
 
-    fields.forEach((field) => {
-      const td = document.createElement("td");
-      td.classList.add("editable");
-      td.textContent = data[field] || "";
-      cells[field] = td;
+    // 🔒 Không cho sửa ô Tiến độ nếu không phải admin
+    const isAdmin = currentUser.email === "admin@qlda.com";
+    if (field === "progress" && !isAdmin) {
+      td.style.backgroundColor = "#eee";
+      tr.appendChild(td);
+      return;
+    }
 
+    // ⬇ Nếu là "report" thì tạo dropdown
+    if (field === "report") {
       td.onclick = () => {
-        const input = document.createElement("input");
-        input.value = td.textContent;
+        const select = document.createElement("select");
+        const options = ["Chưa hoàn thành", "Đã hoàn thành"];
+        options.forEach(opt => {
+          const option = document.createElement("option");
+          option.value = opt;
+          option.text = opt;
+          if (opt === data[field]) option.selected = true;
+          select.appendChild(option);
+        });
+
         td.textContent = "";
-        td.appendChild(input);
-        input.focus();
+        td.appendChild(select);
+        select.focus();
 
-        input.onblur = async () => {
-          const newValue = input.value.trim();
-          td.textContent = newValue;
-          data[field] = newValue;
+        select.onchange = async () => {
+          const value = select.value;
+          td.textContent = value;
+          data[field] = value;
 
-          // ⏱ Đánh giá tự động nếu là ô tiến độ
-          if (field === "progress") {
-            const auto = evaluateProgress(newValue);
-            cells["result"].textContent = auto;
-            data["result"] = auto;
-          }
+          // Tự đánh giá dựa vào Tiến độ + Báo cáo
+          const auto = evaluateReportResult(data.progress, value);
+          cells["result"].textContent = auto;
+          data["result"] = auto;
 
           if (isNew && data.name && data.progress) {
             const docRef = await db.collection("projects").add({ ...data, userId: currentUser.uid });
@@ -142,41 +158,78 @@
       };
 
       tr.appendChild(td);
-    });
+      return;
+    }
 
-    const deleteTd = document.createElement("td");
-    if (docId) {
-      deleteTd.innerHTML = "<span class='delete-btn'>🗑</span>";
-      deleteTd.onclick = async () => {
-        await db.collection("projects").doc(docId).delete();
-        tr.remove();
+    // Các ô còn lại
+    td.onclick = () => {
+      const input = document.createElement("input");
+      input.value = td.textContent;
+      td.textContent = "";
+      td.appendChild(input);
+      input.focus();
+
+      input.onblur = async () => {
+        const newValue = input.value.trim();
+        td.textContent = newValue;
+        data[field] = newValue;
+
+        if (field === "progress") {
+          // Nếu có báo cáo → đánh giá
+          if (data["report"]) {
+            const auto = evaluateReportResult(newValue, data["report"]);
+            cells["result"].textContent = auto;
+            data["result"] = auto;
+          }
+        }
+
+        if (isNew && data.name && data.progress) {
+          const docRef = await db.collection("projects").add({ ...data, userId: currentUser.uid });
+          tr.replaceWith(renderRow({ ...data }, docRef.id));
+          document.getElementById("projectRows").appendChild(renderRow({}, null, true));
+        } else if (docId) {
+          await db.collection("projects").doc(docId).update(data);
+        }
       };
-    }
-    tr.appendChild(deleteTd);
-    return tr;
+    };
+
+    tr.appendChild(td);
+  });
+
+  // Nút xoá
+  const deleteTd = document.createElement("td");
+  if (docId) {
+    deleteTd.innerHTML = "<span class='delete-btn'>🗑</span>";
+    deleteTd.onclick = async () => {
+      await db.collection("projects").doc(docId).delete();
+      tr.remove();
+    };
+  }
+  tr.appendChild(deleteTd);
+  return tr;
+}
+  function evaluateReportResult(progressDateStr, reportStatus) {
+  if (!progressDateStr || !reportStatus) return "";
+
+  const today = new Date();
+  const [d, m, y] = progressDateStr.split("-");
+  const progressDate = new Date(`${y}-${m}-${d}`);
+  today.setHours(0, 0, 0, 0);
+  progressDate.setHours(0, 0, 0, 0);
+
+  if (reportStatus === "Chưa hoàn thành") {
+    return progressDate > today ? "Phấn đấu hoàn thành" : "Chất lượng kém";
   }
 
-  function formatToDate(str) {
-    const [d, m, y] = str.split("-");
-    return new Date(`${y}-${m}-${d}`);
+  if (reportStatus === "Đã hoàn thành") {
+    return progressDate > today ? "Rất tốt" : "Hơi chậm";
   }
 
-  function evaluateProgress(progressDateStr) {
-    try {
-      const today = new Date();
-      const target = formatToDate(progressDateStr);
-      today.setHours(0, 0, 0, 0);
-      target.setHours(0, 0, 0, 0);
+  return "";
+}
 
-      if (target > today) return "Đang thực hiện";
-      if (target.getTime() === today.getTime()) return "Đúng thời gian";
-      if (target < today) return "Quá thời hạn";
-    } catch {
-      return "Định dạng sai";
-    }
-  }
 </script>
+ 
 
-</script>
 </body>
 </html>
