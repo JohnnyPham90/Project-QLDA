@@ -84,20 +84,24 @@
   }
 </script>
 <script>
-  auth.onAuthStateChanged(async (user) => {
-    if (user) {
-      currentUser = user;
-      document.getElementById("authSection").style.display = "none";
-      document.getElementById("appSection").style.display = "block";
-      const isAdmin = user.email === "admin@qlda.com";
-      const q = isAdmin ? db.collection("projects") : db.collection("projects").where("userId", "==", user.uid);
-      const snap = await q.get();
-      const tbody = document.getElementById("projectRows");
-      tbody.innerHTML = "";
-      snap.forEach(doc => tbody.appendChild(renderRow(doc.data(), doc.id)));
-      tbody.appendChild(renderRow({}, null, true));
-    }
-  });
+auth.onAuthStateChanged(async (user) => {
+  if (user) {
+    currentUser = user;
+    document.getElementById("authSection").style.display = "none";
+    document.getElementById("appSection").style.display = "block";
+
+    const isAdmin = user.email === "admin@qlda.com";
+    const q = isAdmin
+      ? db.collection("projects")
+      : db.collection("projects").where("userId", "==", user.uid);
+    const snap = await q.get();
+
+    const tbody = document.getElementById("projectRows");
+    tbody.innerHTML = "";
+    snap.forEach(doc => tbody.appendChild(renderRow(doc.data(), doc.id)));
+    tbody.appendChild(renderRow({}, null, true));
+  }
+});
 
   function renderRow(data, docId, isNew = false) {
     const tr = document.createElement("tr");
