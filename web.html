@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tiến độ Dự án</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f4; }
+    h2 { color: #333; }
+    table { border-collapse: collapse; width: 100%; background: white; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background-color: #eee; }
+    .admin-section { margin-top: 40px; }
+    button { padding: 6px 10px; }
+  </style>
+</head>
+<body>
+  <h2>Đăng nhập</h2>
+  <select id="userSelect">
+    <option value="user">Người dùng</option>
+    <option value="admin">Quản trị viên</option>
+  </select>
+  <button onclick="login()">Vào hệ thống</button>
+
+  <div id="projectTable" style="display:none">
+    <h2>Bảng Tiến độ Dự án</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Tên dự án</th>
+          <th>Công việc</th>
+          <th>Tiến độ</th>
+          <th>Đánh giá</th>
+          <th>Khó khăn</th>
+        </tr>
+      </thead>
+      <tbody id="projectRows"></tbody>
+    </table>
+  </div>
+
+  <div class="admin-section" id="adminView" style="display:none">
+    <h2>Quản lý Dự án (Admin)</h2>
+    <ul id="adminList"></ul>
+  </div>
+
+  <script>
+    const data = [
+      { user: 'user', name: 'Dự án A', task: 'Thi công móng', progress: '70%', result: 'Tốt', issue: 'Trời mưa' },
+      { user: 'user', name: 'Dự án B', task: 'Lắp đặt MBA', progress: '40%', result: 'Trung bình', issue: 'Thiếu vật tư' },
+      { user: 'other', name: 'Dự án C', task: 'Kéo dây', progress: '90%', result: 'Tốt', issue: 'Không có' },
+    ];
+
+    function login() {
+      const role = document.getElementById('userSelect').value;
+      document.getElementById('projectTable').style.display = 'block';
+
+      const rows = document.getElementById('projectRows');
+      rows.innerHTML = '';
+
+      data.forEach(project => {
+        if (role === 'admin' || project.user === role) {
+          rows.innerHTML += `<tr>
+            <td>${project.name}</td>
+            <td>${project.task}</td>
+            <td>${project.progress}</td>
+            <td>${project.result}</td>
+            <td>${project.issue}</td>
+          </tr>`;
+        }
+      });
+
+      if (role === 'admin') {
+        const adminList = document.getElementById('adminList');
+        document.getElementById('adminView').style.display = 'block';
+        adminList.innerHTML = '';
+        data.forEach(p => {
+          adminList.innerHTML += `<li>${p.name} <button onclick="alert('Dự án: ${p.name}\nCông việc: ${p.task}\nTiến độ: ${p.progress}\nĐánh giá: ${p.result}\nVướng mắc: ${p.issue}')">Xem</button></li>`;
+        });
+      } else {
+        document.getElementById('adminView').style.display = 'none';
+      }
+    }
+  </script>
+</body>
+</html>
