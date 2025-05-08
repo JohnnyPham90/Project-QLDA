@@ -4,11 +4,26 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>QLDA - Tiến độ Dự án</title>
+  <style>
+    body { font-family: Arial; background: #f4f4f4; padding: 20px; }
+    input, button { margin: 4px; padding: 6px; }
+    table { border-collapse: collapse; width: 100%; background: #fff; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; }
+    th { background: #eee; }
+    td.editable { cursor: pointer; }
+    td input { width: 100%; border: none; padding: 4px; box-sizing: border-box; }
+    .delete-btn { color: red; cursor: pointer; }
+  </style>
   <script type="module">
-    // Import Firebase SDK
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+    import {
+      getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      onAuthStateChanged, signOut
+    } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+    import {
+      getFirestore, collection, addDoc, query, where, getDocs,
+      updateDoc, deleteDoc, doc
+    } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCawOPhgU4mp3JD1A8bNDWmIP0XHzUJlUk",
@@ -24,6 +39,7 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
+    let currentUser = null;
     window.onload = () => {
       document.getElementById("loginBtn").onclick = async () => {
         const email = document.getElementById("email").value;
@@ -50,54 +66,71 @@
         await signOut(auth);
         location.reload();
       };
-
       onAuthStateChanged(auth, async (user) => {
         if (user) {
+          currentUser = user;
           document.getElementById("authSection").style.display = "none";
           document.getElementById("appSection").style.display = "block";
 
-          const q = user.email === "admin@qlda.com"
+          const isAdmin = user.email === "admin@qlda.com";
+          const q = isAdmin
             ? query(collection(db, "projects"))
             : query(collection(db, "projects"), where("userId", "==", user.uid));
           const querySnapshot = await getDocs(q);
 
-          const table = document.getElementById("projectRows");
-          table.innerHTML = "";
-          querySnapshot.forEach(doc => {
-            const d = doc.data();
-            table.innerHTML += `<tr>
-              <td>${d.name}</td>
-              <td>${d.task}</td>
-              <td>${d.progress}</td>
-              <td>${d.result}</td>
-              <td>${d.issue}</td>
-            </tr>`;
+          const tbody = document.getElementById("projectRows");
+          tbody.innerHTML = "";
+          querySnapshot.forEach(docSnap => {
+            const data = docSnap.data();
+            const tr = renderRow(data, docSnap.id);
+            tbody.appendChild(tr);
           });
 
-          document.getElementById("addProjectBtn").onclick = async () => {
-            const name = prompt("Tên dự án:");
-            const task = prompt("Công việc:");
-            const progress = prompt("Tiến độ:");
-            const result = prompt("Đánh giá:");
-            const issue = prompt("Vướng mắc:");
-            await addDoc(collection(db, "projects"), {
-              userId: user.uid,
-              name, task, progress, result, issue
-            });
-            alert("Đã thêm dự án. Reload trang để xem.");
-          };
+          tbody.appendChild(renderRow({}, null, true)); // dòng trống
         }
+      };
+    });
+
+    function renderRow(data, docId, isNew = false) {
+      const tr = document.createElement("tr");
+      const fields = ["name", "task", "progress", "result", "issue"];
+      fields.forEach(field => {
+        const td = document.createElement("td");
+        td.classList.add("editable");
+
+        const value = data[field] || "";
+        td.textContent = value;
+
+        td.onclick = () => {
+          const input = document.createElement("input");
+          input.value = td.textContent;
+          td.textContent = "";
+          td.appendChild(input);
+          input.focus();
+
+          input.onblur = async () => {
+            const newValue = input.value;
+            td.textContent = newValue;
+            data[field] = newValue;
+
+            if (isNew && data.name) {
+              const docRef = await addDoc(collection(db, "projects"), {
+                ...data, userId: currentUser.uid
+              });
+              tr.replaceWith(renderRow({ ...data }, docRef.id));
+              const tbody = document.getElementById("projectRows");
+              tbody.appendChild(renderRow({}, null, true));
+            } else if (docId) {
+              await updateDoc(doc(db, "projects", docId), { [field]: newValue });
+            }
+          };
+        };
+        tr.appendChild(td);
       });
-    };
-  </script>
-  <style>
-    body { font-family: Arial; background: #f4f4f4; padding: 20px; }
-    input { margin: 4px; padding: 6px; }
-    table { border-collapse: collapse; width: 100%; background: #fff; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 8px; }
-    th { background: #eee; }
-  </style>
-</head>
+
+      const deleteTd = document.createElement("td");
+      if (docId) {
+        deleteTd.innerHTML = "<
 <body>
   <h2>Quản lý tiến độ dự án</h2>
 
@@ -110,8 +143,6 @@
 
   <div id="appSection" style="display:none;">
     <button id="logoutBtn">Đăng xuất</button>
-    <button id="addProjectBtn">➕ Thêm dự án</button>
-
     <table>
       <thead>
         <tr>
@@ -120,6 +151,7 @@
           <th>Tiến độ</th>
           <th>Đánh giá</th>
           <th>Vướng mắc</th>
+          <th>Xoá</th>
         </tr>
       </thead>
       <tbody id="projectRows"></tbody>
