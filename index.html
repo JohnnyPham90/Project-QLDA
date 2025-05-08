@@ -152,6 +152,25 @@ function renderRow(data, docId, isNew = false) {
   tr.appendChild(deleteTd);
   return tr;
 }
+function formatToDate(str) {
+  const [d, m, y] = str.split("-");
+  return new Date(`${y}-${m}-${d}`);
+}
+
+function evaluateProgress(progressDateStr) {
+  try {
+    const today = new Date();
+    const target = formatToDate(progressDateStr);
+    today.setHours(0, 0, 0, 0);
+    target.setHours(0, 0, 0, 0);
+
+    if (target > today) return "Đang thực hiện";
+    if (target.getTime() === today.getTime()) return "Đúng thời gian";
+    if (target < today) return "Quá thời hạn";
+  } catch {
+    return "Định dạng sai";
+  }
+}
 
 
 </script>
