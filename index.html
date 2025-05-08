@@ -139,6 +139,94 @@ function evaluateProgress(progressDateStr) {
     return "Định dạng sai";
   }
 }
+function renderRow(data, docId, isNew = false) {
+  const tr = document.createElement("tr");
+  const fields = ["name", "task", "progress", "result", "issue"];
+  const cells = {};
+
+  fields.forEach((field) => {
+    const td = document.createElement("td");
+    td.classList.add("editable");
+    td.textContent = data[field] || "";
+    cells[field] = td;
+
+    td.onclick = () => {
+      const input = document.createElement("input");
+
+      // Nếu là ô Tiến độ → dùng input type="date"
+      if (field === "progress") {
+        input.type = "date";
+
+        if (data[field]) {
+          const [d, m, y] = data[field].split("-");
+          input.value = `${y}-${m}-${d}`;
+        }
+
+        td.textContent = "";
+        td.appendChild(input);
+        input.focus();
+
+        input.onchange = async () => {
+          const selected = input.value;
+          if (selected) {
+            const [y, m, d] = selected.split("-");
+            const formatted = `${d}-${m}-${y}`;
+            td.textContent = formatted;
+            data[field] = formatted;
+
+            const auto = evaluateProgress(formatted);
+            cells["result"].textContent = auto;
+            data["result"] = auto;
+
+            if (isNew && data.name && data.progress) {
+              const docRef = await db.collection("projects").add({ ...data, userId: currentUser.uid });
+              tr.replaceWith(renderRow({ ...data }, docRef.id));
+              document.getElementById("projectRows").appendChild(renderRow({}, null, true));
+            } else if (docId) {
+              await db.collection("projects").doc(docId).update(data);
+            }
+          }
+        };
+
+        return;
+      }
+
+      // Các ô còn lại xử lý như cũ
+      input.type = "text";
+      input.value = td.textContent;
+      td.textContent = "";
+      td.appendChild(input);
+      input.focus();
+
+      input.onblur = async () => {
+        const newValue = input.value.trim();
+        td.textContent = newValue;
+        data[field] = newValue;
+
+        if (isNew && data.name && data.progress) {
+          const docRef = await db.collection("projects").add({ ...data, userId: currentUser.uid });
+          tr.replaceWith(renderRow({ ...data }, docRef.id));
+          document.getElementById("projectRows").appendChild(renderRow({}, null, true));
+        } else if (docId) {
+          await db.collection("projects").doc(docId).update(data);
+        }
+      };
+    };
+
+    tr.appendChild(td);
+  });
+
+  const deleteTd = document.createElement("td");
+  if (docId) {
+    deleteTd.innerHTML = "<span class='delete-btn'>🗑</span>";
+    deleteTd.onclick = async () => {
+      await db.collection("projects").doc(docId).delete();
+      tr.remove();
+    };
+  }
+  tr.appendChild(deleteTd);
+  return tr;
+}
 
 
 
