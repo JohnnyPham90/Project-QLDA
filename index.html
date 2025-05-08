@@ -114,58 +114,6 @@ function evaluateProgress(progressDateStr) {
   if (target < today) return "Quá thời hạn";
   return "";
 }
-
-function renderRow(data, docId, isNew = false) {
-  const tr = document.createElement("tr");
-  const fields = ["name", "task", "progress", "result", "issue"];
-  fields.forEach(field => {
-    const td = document.createElement("td");
-    td.classList.add("editable");
-    td.textContent = data[field] || "";
-
-    td.onclick = () => {
-      const input = document.createElement("input");
-      input.value = td.textContent;
-      td.textContent = "";
-      td.appendChild(input);
-      input.focus();
-
-      input.onblur = async () => {
-        const newValue = input.value;
-        td.textContent = newValue;
-        data[field] = newValue;
-
-        // Nếu sửa ô "progress", cập nhật ô "result" tự động
-        if (field === "progress") {
-          const auto = evaluateProgress(newValue);
-          tr.children[3].textContent = auto; // ô đánh giá
-          data.result = auto;
-        }
-
-        if (isNew && data.name && data.progress) {
-          const docRef = await db.collection("projects").add({ ...data, userId: currentUser.uid });
-          tr.replaceWith(renderRow({ ...data }, docRef.id));
-          document.getElementById("projectRows").appendChild(renderRow({}, null, true));
-        } else if (docId) {
-          await db.collection("projects").doc(docId).update(data);
-        }
-      };
-    };
-
-    tr.appendChild(td);
-  });
-
-  const deleteTd = document.createElement("td");
-  if (docId) {
-    deleteTd.innerHTML = "<span class='delete-btn'>🗑</span>";
-    deleteTd.onclick = async () => {
-      await db.collection("projects").doc(docId).delete();
-      tr.remove();
-    };
-  }
-  tr.appendChild(deleteTd);
-  return tr;
-}
 function renderRow(data, docId, isNew = false) {
   const tr = document.createElement("tr");
   const fields = ["name", "task", "progress", "result", "issue"];
@@ -178,47 +126,6 @@ function renderRow(data, docId, isNew = false) {
     cells[field] = td;
 
     td.onclick = () => {
-      // Xử lý riêng ô Tiến độ
-      if (field === "progress") {
-        const input = document.createElement("input");
-        input.type = "date";
-
-        // Nếu đã có giá trị, chuyển dd-mm-yyyy → yyyy-mm-dd
-        if (data[field]) {
-          const [d, m, y] = data[field].split("-");
-          input.value = `${y}-${m}-${d}`;
-        }
-
-        td.textContent = "";
-        td.appendChild(input);
-        input.focus();
-
-        input.onchange = async () => {
-          const selected = input.value; // yyyy-mm-dd
-          if (selected) {
-            const [y, m, d] = selected.split("-");
-            const formatted = `${d}-${m}-${y}`;
-            td.textContent = formatted;
-            data[field] = formatted;
-
-            // Tự đánh giá
-            const auto = evaluateProgress(formatted);
-            cells["result"].textContent = auto;
-            data["result"] = auto;
-
-            if (isNew && data.name && data.progress) {
-              const docRef = await db.collection("projects").add({ ...data, userId: currentUser.uid });
-              tr.replaceWith(renderRow({ ...data }, docRef.id));
-              document.getElementById("projectRows").appendChild(renderRow({}, null, true));
-            } else if (docId) {
-              await db.collection("projects").doc(docId).update(data);
-            }
-          }
-        };
-        return;
-      }
-
-      // Các ô còn lại
       const input = document.createElement("input");
       input.value = td.textContent;
       td.textContent = "";
@@ -229,6 +136,13 @@ function renderRow(data, docId, isNew = false) {
         const newValue = input.value.trim();
         td.textContent = newValue;
         data[field] = newValue;
+
+        // Tự đánh giá khi nhập ngày tiến độ
+        if (field === "progress") {
+          const auto = evaluateProgress(newValue);
+          cells["result"].textContent = auto;
+          data["result"] = auto;
+        }
 
         if (isNew && data.name && data.progress) {
           const docRef = await db.collection("projects").add({ ...data, userId: currentUser.uid });
@@ -243,7 +157,6 @@ function renderRow(data, docId, isNew = false) {
     tr.appendChild(td);
   });
 
-  // Cột xóa
   const deleteTd = document.createElement("td");
   if (docId) {
     deleteTd.innerHTML = "<span class='delete-btn'>🗑</span>";
