@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QLDA - Tiến độ Dự án</title>
   <style>
     body { font-family: Arial; background: #f4f4f4; padding: 20px; }
@@ -14,145 +14,24 @@
     td input { width: 100%; border: none; padding: 4px; box-sizing: border-box; }
     .delete-btn { color: red; cursor: pointer; }
   </style>
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-    import {
-      getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-      onAuthStateChanged, signOut
-    } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-    import {
-      getFirestore, collection, addDoc, query, where, getDocs,
-      updateDoc, deleteDoc, doc
-    } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyCawOPhgU4mp3JD1A8bNDWmIP0XHzUJlUk",
-      authDomain: "project-qlda.firebaseapp.com",
-      projectId: "project-qlda",
-      storageBucket: "project-qlda.firebasestorage.app",
-      messagingSenderId: "174135198782",
-      appId: "1:174135198782:web:4cdbfe8e47209e52a2fd6f",
-      measurementId: "G-TGBCRTW5LB"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-
-    let currentUser = null;
-    window.onload = () => {
-      document.getElementById("loginBtn").onclick = async () => {
-        const email = document.getElementById("email").value;
-        const password = document.getElementById("password").value;
-        try {
-          await signInWithEmailAndPassword(auth, email, password);
-        } catch {
-          alert("Sai tài khoản hoặc mật khẩu");
-        }
-      };
-
-      document.getElementById("signupBtn").onclick = async () => {
-        const email = document.getElementById("email").value;
-        const password = document.getElementById("password").value;
-        try {
-          await createUserWithEmailAndPassword(auth, email, password);
-          alert("Tạo tài khoản thành công");
-        } catch {
-          alert("Lỗi tạo tài khoản");
-        }
-      };
-
-      document.getElementById("logoutBtn").onclick = async () => {
-        await signOut(auth);
-        location.reload();
-      };
-      onAuthStateChanged(auth, async (user) => {
-        if (user) {
-          currentUser = user;
-          document.getElementById("authSection").style.display = "none";
-          document.getElementById("appSection").style.display = "block";
-
-          const isAdmin = user.email === "admin@qlda.com";
-          const q = isAdmin
-            ? query(collection(db, "projects"))
-            : query(collection(db, "projects"), where("userId", "==", user.uid));
-          const querySnapshot = await getDocs(q);
-
-          const tbody = document.getElementById("projectRows");
-          tbody.innerHTML = "";
-          querySnapshot.forEach(docSnap => {
-            const data = docSnap.data();
-            const tr = renderRow(data, docSnap.id);
-            tbody.appendChild(tr);
-          });
-
-          tbody.appendChild(renderRow({}, null, true)); // dòng trống
-        }
-      };
-    });
-
-    function renderRow(data, docId, isNew = false) {
-      const tr = document.createElement("tr");
-      const fields = ["name", "task", "progress", "result", "issue"];
-      fields.forEach(field => {
-        const td = document.createElement("td");
-        td.classList.add("editable");
-
-        const value = data[field] || "";
-        td.textContent = value;
-
-        td.onclick = () => {
-          const input = document.createElement("input");
-          input.value = td.textContent;
-          td.textContent = "";
-          td.appendChild(input);
-          input.focus();
-
-          input.onblur = async () => {
-            const newValue = input.value;
-            td.textContent = newValue;
-            data[field] = newValue;
-
-            if (isNew && data.name) {
-              const docRef = await addDoc(collection(db, "projects"), {
-                ...data, userId: currentUser.uid
-              });
-              tr.replaceWith(renderRow({ ...data }, docRef.id));
-              const tbody = document.getElementById("projectRows");
-              tbody.appendChild(renderRow({}, null, true));
-            } else if (docId) {
-              await updateDoc(doc(db, "projects", docId), { [field]: newValue });
-            }
-          };
-        };
-        tr.appendChild(td);
-      });
-
-      const deleteTd = document.createElement("td");
-      if (docId) {
-        deleteTd.innerHTML = "<span class='delete-btn'>🗑</span>";
-        deleteTd.onclick = async () => {
-          await deleteDoc(doc(db, "projects", docId));
-          tr.remove();
-        };
-      }
-      tr.appendChild(deleteTd);
-      return tr;
-    }
-  </script>
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
   <h2>Quản lý tiến độ dự án</h2>
 
   <div id="authSection">
-    <input id="email" type="email" placeholder="Email" />
-    <input id="password" type="password" placeholder="Mật khẩu" />
-    <button id="loginBtn">Đăng nhập</button>
-    <button id="signupBtn">Đăng ký</button>
+    <input id="email" type="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Mật khẩu">
+    <button onclick="login()">Đăng nhập</button>
+    <button onclick="signup()">Đăng ký</button>
   </div>
 
   <div id="appSection" style="display:none;">
-    <button id="logoutBtn">Đăng xuất</button>
+    <button onclick="logout()">Đăng xuất</button>
     <table>
       <thead>
         <tr>
@@ -167,5 +46,99 @@
       <tbody id="projectRows"></tbody>
     </table>
   </div>
+<script>
+  // Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyCawOPhgU4mp3JD1A8bNDWmIP0XHzUJlUk",
+    authDomain: "project-qlda.firebaseapp.com",
+    projectId: "project-qlda",
+    storageBucket: "project-qlda.firebasestorage.app",
+    messagingSenderId: "174135198782",
+    appId: "1:174135198782:web:4cdbfe8e47209e52a2fd6f",
+    measurementId: "G-TGBCRTW5LB"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+  let currentUser = null;
+</script>
+<script>
+  function login() {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    auth.signInWithEmailAndPassword(email, password)
+      .catch(() => alert("Sai tài khoản hoặc mật khẩu"));
+  }
+
+  function signup() {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    auth.createUserWithEmailAndPassword(email, password)
+      .then(() => alert("Đăng ký thành công"))
+      .catch(() => alert("Lỗi đăng ký"));
+  }
+
+  function logout() {
+    auth.signOut().then(() => location.reload());
+  }
+</script>
+<script>
+  auth.onAuthStateChanged(async (user) => {
+    if (user) {
+      currentUser = user;
+      document.getElementById("authSection").style.display = "none";
+      document.getElementById("appSection").style.display = "block";
+      const isAdmin = user.email === "admin@qlda.com";
+      const q = isAdmin ? db.collection("projects") : db.collection("projects").where("userId", "==", user.uid);
+      const snap = await q.get();
+      const tbody = document.getElementById("projectRows");
+      tbody.innerHTML = "";
+      snap.forEach(doc => tbody.appendChild(renderRow(doc.data(), doc.id)));
+      tbody.appendChild(renderRow({}, null, true));
+    }
+  });
+
+  function renderRow(data, docId, isNew = false) {
+    const tr = document.createElement("tr");
+    const fields = ["name", "task", "progress", "result", "issue"];
+    fields.forEach(field => {
+      const td = document.createElement("td");
+      td.classList.add("editable");
+      td.textContent = data[field] || "";
+      td.onclick = () => {
+        const input = document.createElement("input");
+        input.value = td.textContent;
+        td.textContent = "";
+        td.appendChild(input);
+        input.focus();
+        input.onblur = async () => {
+          const newValue = input.value;
+          td.textContent = newValue;
+          data[field] = newValue;
+          if (isNew && data.name) {
+            const docRef = await db.collection("projects").add({ ...data, userId: currentUser.uid });
+            tr.replaceWith(renderRow({ ...data }, docRef.id));
+            document.getElementById("projectRows").appendChild(renderRow({}, null, true));
+          } else if (docId) {
+            await db.collection("projects").doc(docId).update({ [field]: newValue });
+          }
+        };
+      };
+      tr.appendChild(td);
+    });
+
+    const deleteTd = document.createElement("td");
+    if (docId) {
+      deleteTd.innerHTML = "<span class='delete-btn'>🗑</span>";
+      deleteTd.onclick = async () => {
+        await db.collection("projects").doc(docId).delete();
+        tr.remove();
+      };
+    }
+    tr.appendChild(deleteTd);
+    return tr;
+  }
+</script>
 </body>
 </html>
