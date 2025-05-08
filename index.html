@@ -90,7 +90,9 @@
       document.getElementById("authSection").style.display = "none";
       document.getElementById("appSection").style.display = "block";
       const isAdmin = user.email === "admin@qlda.com";
-      const q = isAdmin ? db.collection("projects") : db.collection("projects").where("userId", "==", user.uid);
+      const q = isAdmin
+        ? db.collection("projects")
+        : db.collection("projects").where("userId", "==", user.uid);
       const snap = await q.get();
       const tbody = document.getElementById("projectRows");
       tbody.innerHTML = "";
@@ -98,80 +100,82 @@
       tbody.appendChild(renderRow({}, null, true));
     }
   });
-function renderRow(data, docId, isNew = false) {
-  const tr = document.createElement("tr");
-  const fields = ["name", "task", "progress", "result", "issue"];
-  const cells = {};
 
-  fields.forEach((field) => {
-    const td = document.createElement("td");
-    td.classList.add("editable");
-    td.textContent = data[field] || "";
-    cells[field] = td;
+  function renderRow(data, docId, isNew = false) {
+    const tr = document.createElement("tr");
+    const fields = ["name", "task", "progress", "result", "issue"];
+    const cells = {};
 
-    td.onclick = () => {
-      const input = document.createElement("input");
-      input.value = td.textContent;
-      td.textContent = "";
-      td.appendChild(input);
-      input.focus();
+    fields.forEach((field) => {
+      const td = document.createElement("td");
+      td.classList.add("editable");
+      td.textContent = data[field] || "";
+      cells[field] = td;
 
-      input.onblur = async () => {
-        const newValue = input.value.trim();
-        td.textContent = newValue;
-        data[field] = newValue;
+      td.onclick = () => {
+        const input = document.createElement("input");
+        input.value = td.textContent;
+        td.textContent = "";
+        td.appendChild(input);
+        input.focus();
 
-        // ⏱ Tự đánh giá nếu nhập ngày tiến độ
-        if (field === "progress") {
-          const auto = evaluateProgress(newValue);
-          cells["result"].textContent = auto;
-          data["result"] = auto;
-        }
+        input.onblur = async () => {
+          const newValue = input.value.trim();
+          td.textContent = newValue;
+          data[field] = newValue;
 
-        if (isNew && data.name && data.progress) {
-          const docRef = await db.collection("projects").add({ ...data, userId: currentUser.uid });
-          tr.replaceWith(renderRow({ ...data }, docRef.id));
-          document.getElementById("projectRows").appendChild(renderRow({}, null, true));
-        } else if (docId) {
-          await db.collection("projects").doc(docId).update(data);
-        }
+          // ⏱ Đánh giá tự động nếu là ô tiến độ
+          if (field === "progress") {
+            const auto = evaluateProgress(newValue);
+            cells["result"].textContent = auto;
+            data["result"] = auto;
+          }
+
+          if (isNew && data.name && data.progress) {
+            const docRef = await db.collection("projects").add({ ...data, userId: currentUser.uid });
+            tr.replaceWith(renderRow({ ...data }, docRef.id));
+            document.getElementById("projectRows").appendChild(renderRow({}, null, true));
+          } else if (docId) {
+            await db.collection("projects").doc(docId).update(data);
+          }
+        };
       };
-    };
 
-    tr.appendChild(td);
-  });
+      tr.appendChild(td);
+    });
 
-  const deleteTd = document.createElement("td");
-  if (docId) {
-    deleteTd.innerHTML = "<span class='delete-btn'>🗑</span>";
-    deleteTd.onclick = async () => {
-      await db.collection("projects").doc(docId).delete();
-      tr.remove();
-    };
+    const deleteTd = document.createElement("td");
+    if (docId) {
+      deleteTd.innerHTML = "<span class='delete-btn'>🗑</span>";
+      deleteTd.onclick = async () => {
+        await db.collection("projects").doc(docId).delete();
+        tr.remove();
+      };
+    }
+    tr.appendChild(deleteTd);
+    return tr;
   }
-  tr.appendChild(deleteTd);
-  return tr;
-}
-function formatToDate(str) {
-  const [d, m, y] = str.split("-");
-  return new Date(`${y}-${m}-${d}`);
-}
 
-function evaluateProgress(progressDateStr) {
-  try {
-    const today = new Date();
-    const target = formatToDate(progressDateStr);
-    today.setHours(0, 0, 0, 0);
-    target.setHours(0, 0, 0, 0);
-
-    if (target > today) return "Đang thực hiện";
-    if (target.getTime() === today.getTime()) return "Đúng thời gian";
-    if (target < today) return "Quá thời hạn";
-  } catch {
-    return "Định dạng sai";
+  function formatToDate(str) {
+    const [d, m, y] = str.split("-");
+    return new Date(`${y}-${m}-${d}`);
   }
-}
 
+  function evaluateProgress(progressDateStr) {
+    try {
+      const today = new Date();
+      const target = formatToDate(progressDateStr);
+      today.setHours(0, 0, 0, 0);
+      target.setHours(0, 0, 0, 0);
+
+      if (target > today) return "Đang thực hiện";
+      if (target.getTime() === today.getTime()) return "Đúng thời gian";
+      if (target < today) return "Quá thời hạn";
+    } catch {
+      return "Định dạng sai";
+    }
+  }
+</script>
 
 </script>
 </body>
