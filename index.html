@@ -84,25 +84,20 @@
   }
 </script>
 <script>
-auth.onAuthStateChanged(async (user) => {
-  if (user) {
-    currentUser = user;
-    document.getElementById("authSection").style.display = "none";
-    document.getElementById("appSection").style.display = "block";
-
-    const isAdmin = user.email === "admin@qlda.com";
-    const q = isAdmin
-      ? db.collection("projects")
-      : db.collection("projects").where("userId", "==", user.uid);
-    const snap = await q.get();
-
-    const tbody = document.getElementById("projectRows");
-    tbody.innerHTML = "";
-    snap.forEach(doc => tbody.appendChild(renderRow(doc.data(), doc.id)));
-    tbody.appendChild(renderRow({}, null, true));
-  }
-});
-
+  auth.onAuthStateChanged(async (user) => {
+    if (user) {
+      currentUser = user;
+      document.getElementById("authSection").style.display = "none";
+      document.getElementById("appSection").style.display = "block";
+      const isAdmin = user.email === "admin@qlda.com";
+      const q = isAdmin ? db.collection("projects") : db.collection("projects").where("userId", "==", user.uid);
+      const snap = await q.get();
+      const tbody = document.getElementById("projectRows");
+      tbody.innerHTML = "";
+      snap.forEach(doc => tbody.appendChild(renderRow(doc.data(), doc.id)));
+      tbody.appendChild(renderRow({}, null, true));
+    }
+  });
 function formatToDate(str) {
   const [d, m, y] = str.split("-");
   return new Date(`${y}-${m}-${d}`);
@@ -120,88 +115,32 @@ function evaluateProgress(progressDateStr) {
   return "";
 }
 
-function formatToDate(str) {
-  const [d, m, y] = str.split("-");
-  return new Date(`${y}-${m}-${d}`);
-}
-
-function evaluateProgress(progressDateStr) {
-  try {
-    const today = new Date();
-    const target = formatToDate(progressDateStr);
-    today.setHours(0, 0, 0, 0);
-    target.setHours(0, 0, 0, 0);
-
-    if (target > today) return "Đang thực hiện";
-    if (target.getTime() === today.getTime()) return "Đúng thời gian";
-    if (target < today) return "Quá thời hạn";
-  } catch {
-    return "Định dạng sai";
-  }
-}
 function renderRow(data, docId, isNew = false) {
   const tr = document.createElement("tr");
   const fields = ["name", "task", "progress", "result", "issue"];
-  const cells = {};
-
-  fields.forEach((field) => {
+  fields.forEach(field => {
     const td = document.createElement("td");
     td.classList.add("editable");
     td.textContent = data[field] || "";
-    cells[field] = td;
 
     td.onclick = () => {
       const input = document.createElement("input");
-
-      // Nếu là ô Tiến độ → dùng input type="date"
-      if (field === "progress") {
-        input.type = "date";
-
-        if (data[field]) {
-          const [d, m, y] = data[field].split("-");
-          input.value = `${y}-${m}-${d}`;
-        }
-
-        td.textContent = "";
-        td.appendChild(input);
-        input.focus();
-
-        input.onchange = async () => {
-          const selected = input.value;
-          if (selected) {
-            const [y, m, d] = selected.split("-");
-            const formatted = `${d}-${m}-${y}`;
-            td.textContent = formatted;
-            data[field] = formatted;
-
-            const auto = evaluateProgress(formatted);
-            cells["result"].textContent = auto;
-            data["result"] = auto;
-
-            if (isNew && data.name && data.progress) {
-              const docRef = await db.collection("projects").add({ ...data, userId: currentUser.uid });
-              tr.replaceWith(renderRow({ ...data }, docRef.id));
-              document.getElementById("projectRows").appendChild(renderRow({}, null, true));
-            } else if (docId) {
-              await db.collection("projects").doc(docId).update(data);
-            }
-          }
-        };
-
-        return;
-      }
-
-      // Các ô còn lại xử lý như cũ
-      input.type = "text";
       input.value = td.textContent;
       td.textContent = "";
       td.appendChild(input);
       input.focus();
 
       input.onblur = async () => {
-        const newValue = input.value.trim();
+        const newValue = input.value;
         td.textContent = newValue;
         data[field] = newValue;
+
+        // Nếu sửa ô "progress", cập nhật ô "result" tự động
+        if (field === "progress") {
+          const auto = evaluateProgress(newValue);
+          tr.children[3].textContent = auto; // ô đánh giá
+          data.result = auto;
+        }
 
         if (isNew && data.name && data.progress) {
           const docRef = await db.collection("projects").add({ ...data, userId: currentUser.uid });
@@ -227,9 +166,97 @@ function renderRow(data, docId, isNew = false) {
   tr.appendChild(deleteTd);
   return tr;
 }
+function renderRow(data, docId, isNew = false) {
+  const tr = document.createElement("tr");
+  const fields = ["name", "task", "progress", "result", "issue"];
+  const cells = {};
 
+  fields.forEach((field) => {
+    const td = document.createElement("td");
+    td.classList.add("editable");
+    td.textContent = data[field] || "";
+    cells[field] = td;
 
+    td.onclick = () => {
+      // Xử lý riêng ô Tiến độ
+      if (field === "progress") {
+        const input = document.createElement("input");
+        input.type = "date";
 
+        // Nếu đã có giá trị, chuyển dd-mm-yyyy → yyyy-mm-dd
+        if (data[field]) {
+          const [d, m, y] = data[field].split("-");
+          input.value = `${y}-${m}-${d}`;
+        }
+
+        td.textContent = "";
+        td.appendChild(input);
+        input.focus();
+
+        input.onchange = async () => {
+          const selected = input.value; // yyyy-mm-dd
+          if (selected) {
+            const [y, m, d] = selected.split("-");
+            const formatted = `${d}-${m}-${y}`;
+            td.textContent = formatted;
+            data[field] = formatted;
+
+            // Tự đánh giá
+            const auto = evaluateProgress(formatted);
+            cells["result"].textContent = auto;
+            data["result"] = auto;
+
+            if (isNew && data.name && data.progress) {
+              const docRef = await db.collection("projects").add({ ...data, userId: currentUser.uid });
+              tr.replaceWith(renderRow({ ...data }, docRef.id));
+              document.getElementById("projectRows").appendChild(renderRow({}, null, true));
+            } else if (docId) {
+              await db.collection("projects").doc(docId).update(data);
+            }
+          }
+        };
+        return;
+      }
+
+      // Các ô còn lại
+      const input = document.createElement("input");
+      input.value = td.textContent;
+      td.textContent = "";
+      td.appendChild(input);
+      input.focus();
+
+      input.onblur = async () => {
+        const newValue = input.value.trim();
+        td.textContent = newValue;
+        data[field] = newValue;
+
+        if (isNew && data.name && data.progress) {
+          const docRef = await db.collection("projects").add({ ...data, userId: currentUser.uid });
+          tr.replaceWith(renderRow({ ...data }, docRef.id));
+          document.getElementById("projectRows").appendChild(renderRow({}, null, true));
+        } else if (docId) {
+          await db.collection("projects").doc(docId).update(data);
+        }
+      };
+    };
+
+    tr.appendChild(td);
+  });
+
+  // Cột xóa
+  const deleteTd = document.createElement("td");
+  if (docId) {
+    deleteTd.innerHTML = "<span class='delete-btn'>🗑</span>";
+    deleteTd.onclick = async () => {
+      await db.collection("projects").doc(docId).delete();
+      tr.remove();
+    };
+  }
+  tr.appendChild(deleteTd);
+  return tr;
+}
+
+  
 </script>
 </body>
 </html>
