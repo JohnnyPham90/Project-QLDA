@@ -120,60 +120,26 @@ function evaluateProgress(progressDateStr) {
   return "";
 }
 
-function renderRow(data, docId, isNew = false) {
-  const tr = document.createElement("tr");
-  const fields = ["name", "task", "progress", "result", "issue"];
-  const cellRefs = {}; // lưu tham chiếu ô theo field
-
-  fields.forEach(field => {
-    const td = document.createElement("td");
-    td.classList.add("editable");
-    td.textContent = data[field] || "";
-    cellRefs[field] = td; // lưu để sau này cập nhật dễ
-
-    td.onclick = () => {
-      const input = document.createElement("input");
-      input.value = td.textContent;
-      td.textContent = "";
-      td.appendChild(input);
-      input.focus();
-
-      input.onblur = async () => {
-        const newValue = input.value;
-        td.textContent = newValue;
-        data[field] = newValue;
-
-        // Tự đánh giá nếu sửa tiến độ
-        if (field === "progress") {
-          const auto = evaluateProgress(newValue);
-          cellRefs["result"].textContent = auto;
-          data["result"] = auto;
-        }
-
-        if (isNew && data.name && data.progress) {
-          const docRef = await db.collection("projects").add({ ...data, userId: currentUser.uid });
-          tr.replaceWith(renderRow({ ...data }, docRef.id));
-          document.getElementById("projectRows").appendChild(renderRow({}, null, true));
-        } else if (docId) {
-          await db.collection("projects").doc(docId).update(data);
-        }
-      };
-    };
-
-    tr.appendChild(td);
-  });
-
-  const deleteTd = document.createElement("td");
-  if (docId) {
-    deleteTd.innerHTML = "<span class='delete-btn'>🗑</span>";
-    deleteTd.onclick = async () => {
-      await db.collection("projects").doc(docId).delete();
-      tr.remove();
-    };
-  }
-  tr.appendChild(deleteTd);
-  return tr;
+function formatToDate(str) {
+  const [d, m, y] = str.split("-");
+  return new Date(`${y}-${m}-${d}`);
 }
+
+function evaluateProgress(progressDateStr) {
+  try {
+    const today = new Date();
+    const target = formatToDate(progressDateStr);
+    today.setHours(0, 0, 0, 0);
+    target.setHours(0, 0, 0, 0);
+
+    if (target > today) return "Đang thực hiện";
+    if (target.getTime() === today.getTime()) return "Đúng thời gian";
+    if (target < today) return "Quá thời hạn";
+  } catch {
+    return "Định dạng sai";
+  }
+}
+
 
 
 </script>
