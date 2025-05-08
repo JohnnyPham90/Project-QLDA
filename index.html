@@ -121,7 +121,7 @@ function renderRow(data, docId, isNew = false) {
         td.textContent = newValue;
         data[field] = newValue;
 
-        // Tự đánh giá khi nhập ngày tiến độ
+        // ⏱ Tự đánh giá nếu nhập ngày tiến độ
         if (field === "progress") {
           const auto = evaluateProgress(newValue);
           cells["result"].textContent = auto;
@@ -152,6 +152,7 @@ function renderRow(data, docId, isNew = false) {
   tr.appendChild(deleteTd);
   return tr;
 }
+
 
 </script>
 </body>
