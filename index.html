@@ -101,13 +101,13 @@
 function renderRow(data, docId, isNew = false) {
   const tr = document.createElement("tr");
   const fields = ["name", "task", "progress", "result", "issue"];
-  const cellRefs = {}; // lưu tham chiếu ô theo field
+  const cells = {};
 
-  fields.forEach(field => {
+  fields.forEach((field) => {
     const td = document.createElement("td");
     td.classList.add("editable");
     td.textContent = data[field] || "";
-    cellRefs[field] = td; // lưu để sau này cập nhật dễ
+    cells[field] = td;
 
     td.onclick = () => {
       const input = document.createElement("input");
@@ -117,14 +117,14 @@ function renderRow(data, docId, isNew = false) {
       input.focus();
 
       input.onblur = async () => {
-        const newValue = input.value;
+        const newValue = input.value.trim();
         td.textContent = newValue;
         data[field] = newValue;
 
-        // Tự đánh giá nếu sửa tiến độ
+        // Tự đánh giá khi nhập ngày tiến độ
         if (field === "progress") {
           const auto = evaluateProgress(newValue);
-          cellRefs["result"].textContent = auto;
+          cells["result"].textContent = auto;
           data["result"] = auto;
         }
 
@@ -152,7 +152,6 @@ function renderRow(data, docId, isNew = false) {
   tr.appendChild(deleteTd);
   return tr;
 }
-
 
 </script>
 </body>
