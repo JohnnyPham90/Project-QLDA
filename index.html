@@ -123,10 +123,13 @@ function evaluateProgress(progressDateStr) {
 function renderRow(data, docId, isNew = false) {
   const tr = document.createElement("tr");
   const fields = ["name", "task", "progress", "result", "issue"];
+  const cellRefs = {}; // lưu tham chiếu ô theo field
+
   fields.forEach(field => {
     const td = document.createElement("td");
     td.classList.add("editable");
     td.textContent = data[field] || "";
+    cellRefs[field] = td; // lưu để sau này cập nhật dễ
 
     td.onclick = () => {
       const input = document.createElement("input");
@@ -140,11 +143,11 @@ function renderRow(data, docId, isNew = false) {
         td.textContent = newValue;
         data[field] = newValue;
 
-        // Nếu sửa ô "progress", cập nhật ô "result" tự động
+        // Tự đánh giá nếu sửa tiến độ
         if (field === "progress") {
           const auto = evaluateProgress(newValue);
-          tr.children[3].textContent = auto; // ô đánh giá
-          data.result = auto;
+          cellRefs["result"].textContent = auto;
+          data["result"] = auto;
         }
 
         if (isNew && data.name && data.progress) {
@@ -171,6 +174,7 @@ function renderRow(data, docId, isNew = false) {
   tr.appendChild(deleteTd);
   return tr;
 }
+
 
 </script>
 </body>
