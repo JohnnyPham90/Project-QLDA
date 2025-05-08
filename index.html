@@ -2,28 +2,116 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tiến độ Dự án</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>QLDA - Tiến độ Dự án</title>
+  <script type="module">
+    // Import Firebase SDK
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCawOPhgU4mp3JD1A8bNDWmIP0XHzUJlUk",
+      authDomain: "project-qlda.firebaseapp.com",
+      projectId: "project-qlda",
+      storageBucket: "project-qlda.firebasestorage.app",
+      messagingSenderId: "174135198782",
+      appId: "1:174135198782:web:4cdbfe8e47209e52a2fd6f",
+      measurementId: "G-TGBCRTW5LB"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    window.onload = () => {
+      document.getElementById("loginBtn").onclick = async () => {
+        const email = document.getElementById("email").value;
+        const password = document.getElementById("password").value;
+        try {
+          await signInWithEmailAndPassword(auth, email, password);
+        } catch {
+          alert("Sai tài khoản hoặc mật khẩu");
+        }
+      };
+
+      document.getElementById("signupBtn").onclick = async () => {
+        const email = document.getElementById("email").value;
+        const password = document.getElementById("password").value;
+        try {
+          await createUserWithEmailAndPassword(auth, email, password);
+          alert("Tạo tài khoản thành công");
+        } catch {
+          alert("Lỗi tạo tài khoản");
+        }
+      };
+
+      document.getElementById("logoutBtn").onclick = async () => {
+        await signOut(auth);
+        location.reload();
+      };
+
+      onAuthStateChanged(auth, async (user) => {
+        if (user) {
+          document.getElementById("authSection").style.display = "none";
+          document.getElementById("appSection").style.display = "block";
+
+          const q = user.email === "admin@qlda.com"
+            ? query(collection(db, "projects"))
+            : query(collection(db, "projects"), where("userId", "==", user.uid));
+          const querySnapshot = await getDocs(q);
+
+          const table = document.getElementById("projectRows");
+          table.innerHTML = "";
+          querySnapshot.forEach(doc => {
+            const d = doc.data();
+            table.innerHTML += `<tr>
+              <td>${d.name}</td>
+              <td>${d.task}</td>
+              <td>${d.progress}</td>
+              <td>${d.result}</td>
+              <td>${d.issue}</td>
+            </tr>`;
+          });
+
+          document.getElementById("addProjectBtn").onclick = async () => {
+            const name = prompt("Tên dự án:");
+            const task = prompt("Công việc:");
+            const progress = prompt("Tiến độ:");
+            const result = prompt("Đánh giá:");
+            const issue = prompt("Vướng mắc:");
+            await addDoc(collection(db, "projects"), {
+              userId: user.uid,
+              name, task, progress, result, issue
+            });
+            alert("Đã thêm dự án. Reload trang để xem.");
+          };
+        }
+      });
+    };
+  </script>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f4; }
-    h2 { color: #333; }
-    table { border-collapse: collapse; width: 100%; background: white; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-    th { background-color: #eee; }
-    .admin-section { margin-top: 40px; }
-    button { padding: 6px 10px; }
+    body { font-family: Arial; background: #f4f4f4; padding: 20px; }
+    input { margin: 4px; padding: 6px; }
+    table { border-collapse: collapse; width: 100%; background: #fff; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; }
+    th { background: #eee; }
   </style>
 </head>
 <body>
-  <h2>Đăng nhập</h2>
-  <select id="userSelect">
-    <option value="user">Người dùng</option>
-    <option value="admin">Quản trị viên</option>
-  </select>
-  <button onclick="login()">Vào hệ thống</button>
+  <h2>Quản lý tiến độ dự án</h2>
 
-  <div id="projectTable" style="display:none">
-    <h2>Bảng Tiến độ Dự án</h2>
+  <div id="authSection">
+    <input id="email" type="email" placeholder="Email" />
+    <input id="password" type="password" placeholder="Mật khẩu" />
+    <button id="loginBtn">Đăng nhập</button>
+    <button id="signupBtn">Đăng ký</button>
+  </div>
+
+  <div id="appSection" style="display:none;">
+    <button id="logoutBtn">Đăng xuất</button>
+    <button id="addProjectBtn">➕ Thêm dự án</button>
+
     <table>
       <thead>
         <tr>
@@ -31,55 +119,11 @@
           <th>Công việc</th>
           <th>Tiến độ</th>
           <th>Đánh giá</th>
-          <th>Khó khăn</th>
+          <th>Vướng mắc</th>
         </tr>
       </thead>
       <tbody id="projectRows"></tbody>
     </table>
   </div>
-
-  <div class="admin-section" id="adminView" style="display:none">
-    <h2>Quản lý Dự án (Admin)</h2>
-    <ul id="adminList"></ul>
-  </div>
-
-  <script>
-    const data = [
-      { user: 'user', name: 'Dự án A', task: 'Thi công móng', progress: '70%', result: 'Tốt', issue: 'Trời mưa' },
-      { user: 'user', name: 'Dự án B', task: 'Lắp đặt MBA', progress: '40%', result: 'Trung bình', issue: 'Thiếu vật tư' },
-      { user: 'other', name: 'Dự án C', task: 'Kéo dây', progress: '90%', result: 'Tốt', issue: 'Không có' },
-    ];
-
-    function login() {
-      const role = document.getElementById('userSelect').value;
-      document.getElementById('projectTable').style.display = 'block';
-
-      const rows = document.getElementById('projectRows');
-      rows.innerHTML = '';
-
-      data.forEach(project => {
-        if (role === 'admin' || project.user === role) {
-          rows.innerHTML += `<tr>
-            <td>${project.name}</td>
-            <td>${project.task}</td>
-            <td>${project.progress}</td>
-            <td>${project.result}</td>
-            <td>${project.issue}</td>
-          </tr>`;
-        }
-      });
-
-      if (role === 'admin') {
-        const adminList = document.getElementById('adminList');
-        document.getElementById('adminView').style.display = 'block';
-        adminList.innerHTML = '';
-        data.forEach(p => {
-          adminList.innerHTML += `<li>${p.name} <button onclick="alert('Dự án: ${p.name}\nCông việc: ${p.task}\nTiến độ: ${p.progress}\nĐánh giá: ${p.result}\nVướng mắc: ${p.issue}')">Xem</button></li>`;
-        });
-      } else {
-        document.getElementById('adminView').style.display = 'none';
-      }
-    }
-  </script>
 </body>
 </html>
