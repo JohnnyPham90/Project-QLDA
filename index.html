@@ -130,7 +130,17 @@
 
       const deleteTd = document.createElement("td");
       if (docId) {
-        deleteTd.innerHTML = "<
+        deleteTd.innerHTML = "<span class='delete-btn'>🗑</span>";
+        deleteTd.onclick = async () => {
+          await deleteDoc(doc(db, "projects", docId));
+          tr.remove();
+        };
+      }
+      tr.appendChild(deleteTd);
+      return tr;
+    }
+  </script>
+</head>
 <body>
   <h2>Quản lý tiến độ dự án</h2>
 
